@@ -1,6 +1,7 @@
 module Cipher where
 
 import Data.Char
+import Test.QuickCheck
 
 type ShiftAmount = Int
 type Key = String
@@ -33,8 +34,17 @@ shiftVal c = ord c - ord base
 -- | Vignere cipher
 vignere :: Key -> String -> String
 vignere _ [] = []
+vignere [] xs = xs
 vignere ks (' ':xs) = ' ' : vignere ks xs -- skip spaces
 vignere (k:ks) (x:xs) = alphaShift (shiftVal k) x : vignere (ks ++ [k]) xs
+
+unVignere :: Key -> String -> String
+unVignere _ [] = []
+unVignere [] xs = xs
+unVignere ks (' ':xs) = ' ' : unVignere ks xs -- skip spaces
+unVignere (k:ks) (x:xs) =
+    alphaShift (negate . shiftVal $ k) x : unVignere (ks ++ [k]) xs
+
 
 caesarInput :: IO ()
 caesarInput = do
@@ -51,6 +61,12 @@ vignereInput = do
   putStr "Enter cipher key: "
   key <- getLine
   putStrLn $ vignere key plaintext
+
+prop_caesarRoundtrip :: ShiftAmount -> String -> Bool
+prop_caesarRoundtrip n s = (unCaesar n . caesar n) s == s
+
+prop_vignereRoundtrip :: Key -> String -> Bool
+prop_vignereRoundtrip k s = (unVignere k . vignere k) s == s
 
 main :: IO ()
 main = do
