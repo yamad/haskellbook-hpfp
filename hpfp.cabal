@@ -44,6 +44,7 @@ executable tests
   build-depends:      base >= 4.9 && <4.10
                     , hspec
                     , QuickCheck
+                    , checkers
   other-modules:      WordNumberTest
                     , WordNumber
   hs-source-dirs:     .
