@@ -25,10 +25,12 @@ instance Arbitrary a =>
 
 instance Arbitrary a =>
          Arbitrary (List a) where
-  arbitrary = do
-    a <- arbitrary
-    b <- arbitrary
-    frequency [(1, return $ Nil), (3, return $ Cons a (Cons b Nil))]
+  arbitrary = sized arbList
+
+arbList :: Arbitrary a => Int -> Gen (List a)
+arbList 0 = return Nil
+arbList n =
+  frequency [(1, return Nil), (4, Cons <$> arbitrary <*> (arbList (n - 1)))]
 
 
 instance EqProp (Nope a) where
