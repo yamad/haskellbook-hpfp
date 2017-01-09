@@ -35,6 +35,11 @@ oneTwoEOF = oneTwo >> eof
 oneMaybeTwoThree :: Parser String
 oneMaybeTwoThree = choice [string "123", string "12", string "1"] <* eof
 
+oneMaybeTwoThree' :: Parser String
+oneMaybeTwoThree' =
+  (++) <$> string "1" <*>
+  (option "" ((++) <$> string "2" <*> (option "" (string "3"))))
+
 
 -- 3.
 stringViaChar :: String -> Parser String

@@ -5,4 +5,5 @@ import Ch24_SemVer              -- 1.
 import Ch24_Integer             -- 2. and 3.
 import Ch24_Phone               -- 4.
 import Ch24_LogFile             -- 5.
-import Ch24_IPAddress           -- 6.
+import Ch24_IPAddress           -- 6-9.
+import Ch24_Dot                 -- 10.
