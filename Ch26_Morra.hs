@@ -1,22 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 -- | Chapter 26, Monad Transformers, Morra Game
 module Ch26_Morra where
 
-import Control.Monad (liftM2)
 import Control.Monad.Trans.State
-import Data.List (sortOn)
+import Data.Foldable (foldl')
+import Data.List (delete, isPrefixOf, sortOn)
 import System.Random (randomRIO)
 import Text.Read (readMaybe)
 
-data Game = Game [Player]
+data Game =
+  Game [Player]
   deriving (Eq, Show)
 
 data Player = Player
   { plName :: String
   , plScore :: Integer
   , plType :: PlayerType
-  }
-  deriving Eq
+  , plHistory :: [FingerCount]
+  } deriving (Eq)
 
 data PlayerType
   = Human
@@ -24,15 +26,18 @@ data PlayerType
   deriving (Eq, Show)
 
 instance Show Player where
-  show p =
+  show (Player name score typ hist) =
     concat
-      ["Player: ", plName p, "(" ++ show (plType p) ++ ",", show (plScore p) ++ ")"]
+      ["Player: ", name, "(" ++ show typ ++ ",", show score ++ ")", show hist]
 
 type Turn = (FingerCount, GuessSum)
+
 type FingerCount = Integer
+
 type GuessSum = Integer
 
 type Morra m = StateT Game m [Player]
+
 type MorraIO = Morra IO
 
 data MorraError
@@ -47,6 +52,12 @@ winners ts = map (isWin fingerTotal) ts
     isWin :: FingerCount -> Turn -> Bool
     isWin total (_, guess) = guess == total
 
+updateTurn :: Player -> Turn -> Player
+updateTurn pl (count, _) =
+  pl
+  { plHistory = count : plHistory pl
+  }
+
 updateScore :: Player -> Bool -> Player
 updateScore pl isWin =
   if isWin
@@ -55,15 +66,17 @@ updateScore pl isWin =
          }
     else pl
 
-updateGame :: Monad m => [Turn] -> Morra m
-updateGame t =
+updateGame
+  :: Monad m
+  => [Turn] -> Morra m
+updateGame turns =
   StateT $
   \(Game ps) ->
-     let awards = winners t
-         playerAwards = zip ps awards
-         ps' = fmap (uncurry updateScore) playerAwards
-         playerWins = fst <$> filter snd (zip ps' awards)
-     in return (playerWins, Game $ ps')
+     let awards = winners turns
+         ps' = zipWith updateScore ps awards
+         ps'' = zipWith updateTurn ps' turns
+         playerWins = fst <$> filter snd (zip ps'' awards)
+     in return (playerWins, Game ps'')
 
 winThreshold :: Integer
 winThreshold = 3
@@ -75,7 +88,8 @@ runGame =
     (wins, g') <- runStateT runRound g
     case filter isWinner wins of
       [] -> runStateT runGame g' -- no winners yet
-      ws -> do                   -- winner(s) found, report and exit
+      ws -- winner(s) found, report and exit
+       -> do
         reportScores g'
         reportGameWins ws
         return (wins, g')
@@ -88,11 +102,11 @@ reportScores (Game ps) = do
   putStrLn "- Final Scores:"
   mapM_ (putStrLn . scoreLine) (reverse . sortOn plScore $ ps)
   where
-    scoreLine p = concat ["-   ", plName p, ": ", show $ plScore p]
+    scoreLine p =
+      concat ["-   ", plName p, ": ", show $ plScore p]
 
 reportGameWins :: [Player] -> IO ()
-reportGameWins pWinners = do
-  mapM_ (\p -> putStrLn $ "- " ++ plName p ++ " wins game!") pWinners
+reportGameWins = mapM_ (\p -> putStrLn $ concat ["- ", plName p, " wins game!"])
 
 reportRoundWins :: [Player] -> IO ()
 reportRoundWins = mapM_ (\p -> putStrLn ("- " ++ plName p ++ " gets point"))
@@ -134,20 +148,19 @@ getPlayer = do
     else mkComputer <$> getName
 
 mkHuman :: String -> Player
-mkHuman name = Player name 0 Human
+mkHuman name = Player name 0 Human []
 
 mkComputer :: String -> Player
-mkComputer name = Player name 0 Computer
+mkComputer name = Player name 0 Computer []
 
 getName :: IO String
 getName = putStr "Enter name: " >> getLine
 
 getTurns :: Game -> IO [Turn]
-getTurns (Game players) = traverse (getTurn nplayers) players
-  where nplayers = fromIntegral . length $ players
+getTurns (Game players) = traverse (getTurn players) players
 
-getTurn :: Integer -> Player -> IO Turn
-getTurn nplayers (Player name _ typ) = do
+getTurn :: [Player] -> Player -> IO Turn
+getTurn ps p@(Player name _ typ _) = do
   putStr $ "Player " ++ name
   case typ of
     Human -> do
@@ -155,12 +168,21 @@ getTurn nplayers (Player name _ typ) = do
       getHumanTurn
     Computer -> do
       putStrLn " turn generated"
-      genRandomTurn nplayers
+      genPredictTurn (delete p ps)
 
--- | generate random turn, given a count of players
-genRandomTurn :: Integer -> IO Turn
-genRandomTurn nplayers =
-  (,) <$> randomRIO (0, 5) <*> randomRIO (0, 5 * nplayers)
+-- | generate random turn, given list of all players
+genRandomTurn :: [Player] -> IO Turn
+genRandomTurn ps = do
+  fc <- randomRIO (0, 5)
+  guess <- randomRIO (0, 5 * fromIntegral (length ps - 1))
+  return (fc, fc + guess)
+
+-- | generate turn by prediction, given list of all players
+genPredictTurn :: [Player] -> IO Turn
+genPredictTurn ps = do
+   fc <- randomRIO (0, 5)
+   guess <- sum <$> traverse predictOrGuess ps
+   return (fc, fc + guess)
 
 -- Human input
 ---------------
@@ -200,6 +222,41 @@ validateFingerCount (Right i)
   | i >= 0 && i <= 5 = Right i
   | otherwise = Left [FingersOutOfRange]
 
+predictOrGuess :: Player -> IO FingerCount
+predictOrGuess pl =
+  case plType pl of
+    Computer -> randomRIO (0, 5)
+    Human ->
+      case predictNgram 3 $ plHistory pl of
+        -- randomly select from previous guesses
+        Just xs -> (xs !!) <$> randomRIO (0, length xs - 1)
+        -- or fallback to random guess
+        Nothing -> randomRIO (0, 5)
+
+predictNgram :: Integer -> [Integer] -> Maybe [Integer]
+predictNgram n xs = do
+  pre <- takeMaybe (fromIntegral (n-1)) xs
+  case followedWith pre xs of
+    [] -> Nothing
+    xxs -> Just xxs
+
+-- | return values from second list that precede the sequence in the
+-- first list. That is,
+--
+--   @predictVector [1,2] [3,1,2] == [3]@
+--   @predictVector [1] [2,1,3,1,4] == [2,3]@
+followedWith :: [Integer] -> [Integer] -> [Integer]
+followedWith _ [] = []
+followedWith pre (x:xs)
+  | pre `isPrefixOf` xs = x : rest
+  | otherwise = rest
+  where
+    rest = followedWith pre xs
+
+takeMaybe :: Int -> [a] -> Maybe [a]
+takeMaybe 0 _  = Just []
+takeMaybe _ [] = Nothing
+takeMaybe n (x:xs) = (x:) <$> takeMaybe (n - 1) xs
 
 main :: IO ()
 main = do
