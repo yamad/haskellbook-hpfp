@@ -3,9 +3,9 @@
 -- | Chapter 26, Monad Transformers, Morra Game
 module Ch26_Morra where
 
-import Control.Monad.Trans.State
 import Control.Monad (void)
-import Data.Foldable (foldl')
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.State
 import Data.List (delete, isPrefixOf, sortOn)
 import System.Random (randomRIO)
 import Text.Read (readMaybe)
@@ -114,7 +114,7 @@ mkComputer name = Player name 0 Computer []
 getPlayers :: IO [Player]
 getPlayers = do
   putStr "Enter # of players: "
-  nplayers <- getInteger
+  nplayers <- runExceptT getInteger
   putStrLn ""
   case nplayers of
     Left _ -> do
@@ -141,8 +141,8 @@ getHumanTurn = (,) <$> getFingerCount <*> getGuess
 getFingerCount :: IO FingerCount
 getFingerCount = do
   putStr "Fingers (0-5): "
-  efc <- validateFingerCount <$> getInteger
-  case efc of
+  efc <- runExceptT getInteger
+  case validateFingerCount =<< efc of
     Left _ -> do
       putStrLn "Invalid input"
       getFingerCount
@@ -151,7 +151,7 @@ getFingerCount = do
 getGuess :: IO GuessSum
 getGuess = do
   putStr "Guess: "
-  eg <- getInteger
+  eg <- runExceptT getInteger
   case eg of
     Left _ -> do
       putStrLn "Invalid input"
@@ -182,20 +182,18 @@ genRandomTurn ps = do
   guess <- randomRIO (0, 5 * fromIntegral (length ps - 1))
   return (fc, fc + guess)
 
-getInteger :: IO (Either [MorraError] Integer)
-getInteger = do
-  input <- fmap readMaybe getLine
-  case input of
-    Nothing -> return $ Left [InputNotInteger]
-    Just a -> return $ Right a
+getInteger :: ExceptT [MorraError] IO Integer
+getInteger =
+  ExceptT $
+  do input <- fmap readMaybe getLine
+     case input of
+       Nothing -> return $ Left [InputNotInteger]
+       Just a -> return $ Right a
 
-validateFingerCount :: Either [MorraError] Integer -> Either [MorraError] Integer
-validateFingerCount (Left err) = Left err
-validateFingerCount (Right i)
+validateFingerCount :: Integer -> Either [MorraError] Integer
+validateFingerCount i
   | i >= 0 && i <= 5 = Right i
   | otherwise = Left [FingersOutOfRange]
-
-
 
 ---------------------------
 -- * AI Prediction, 3-grams
