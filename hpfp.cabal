@@ -39,12 +39,14 @@ executable hpfp
                      , dlist >= 0.8.0.2
                      , filepath >= 1.4.1.0
                      , hspec
+                     , mtl >= 2.2.1
                      , network-uri
                      , parsec >= 3.1.11
                      , parsers >= 0.12.4
                      , random >=1.1 && <1.2
                      , raw-strings-qq
                      , redis >= 0.14.1
+                     , scotty
                      , scotty
                      , text
                      , time >=1.6 && <1.7
@@ -63,9 +65,11 @@ executable tests
                     , dlist >= 0.8.0.2
                     , filepath >= 1.4.1.0
                     , hspec
+                    , mtl >= 2.2.1
                     , parsec >= 3.1.11
                     , parsers >= 0.12.4
                     , raw-strings-qq
+                    , scotty
                     , trifecta
   other-modules:      WordNumberTest
                     , WordNumber
