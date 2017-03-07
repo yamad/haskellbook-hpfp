@@ -8,4 +8,5 @@ packages:
 - projects/morse/
 extra-deps:
 - redis-0.14.1
-resolver: lts-7.1
+- random-extras-0.19
+resolver: lts-7.9
