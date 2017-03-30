@@ -1,7 +1,6 @@
 module Cipher where
 
 import Data.Char
-import Test.QuickCheck
 
 type ShiftAmount = Int
 type Key = String
@@ -31,19 +30,19 @@ shiftVal c = ord c - ord base
   where base = if isUpper c then 'A' else 'a'
 
 
--- | Vignere cipher
-vignere :: Key -> String -> String
-vignere _ [] = []
-vignere [] xs = xs
-vignere ks (' ':xs) = ' ' : vignere ks xs -- skip spaces
-vignere (k:ks) (x:xs) = alphaShift (shiftVal k) x : vignere (ks ++ [k]) xs
+-- | Vigenere cipher
+vigenere :: Key -> String -> String
+vigenere _ [] = []
+vigenere [] xs = xs
+vigenere ks (' ':xs) = ' ' : vigenere ks xs -- skip spaces
+vigenere (k:ks) (x:xs) = alphaShift (shiftVal k) x : vigenere (ks ++ [k]) xs
 
-unVignere :: Key -> String -> String
-unVignere _ [] = []
-unVignere [] xs = xs
-unVignere ks (' ':xs) = ' ' : unVignere ks xs -- skip spaces
-unVignere (k:ks) (x:xs) =
-    alphaShift (negate . shiftVal $ k) x : unVignere (ks ++ [k]) xs
+unVigenere :: Key -> String -> String
+unVigenere _ [] = []
+unVigenere [] xs = xs
+unVigenere ks (' ':xs) = ' ' : unVigenere ks xs -- skip spaces
+unVigenere (k:ks) (x:xs) =
+    alphaShift (negate . shiftVal $ k) x : unVigenere (ks ++ [k]) xs
 
 
 caesarInput :: IO ()
@@ -54,23 +53,23 @@ caesarInput = do
   shift <- getLine
   putStrLn $ caesar (read shift) plaintext
 
-vignereInput :: IO ()
-vignereInput = do
+vigenereInput :: IO ()
+vigenereInput = do
   putStr "Enter text to encipher: "
   plaintext <- getLine
   putStr "Enter cipher key: "
   key <- getLine
-  putStrLn $ vignere key plaintext
+  putStrLn $ vigenere key plaintext
 
 prop_caesarRoundtrip :: ShiftAmount -> String -> Bool
 prop_caesarRoundtrip n s = (unCaesar n . caesar n) s == s
 
-prop_vignereRoundtrip :: Key -> String -> Bool
-prop_vignereRoundtrip k s = (unVignere k . vignere k) s == s
+prop_vigenereRoundtrip :: Key -> String -> Bool
+prop_vigenereRoundtrip k s = (unVigenere k . vigenere k) s == s
 
-main :: IO ()
-main = do
+testMain :: IO ()
+testMain = do
   putStrLn "Caesar cipher ::"
   caesarInput
-  putStrLn "Vignere cipher ::"
-  vignereInput
+  putStrLn "Vigenere cipher ::"
+  vigenereInput
