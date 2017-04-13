@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module Data.Ini where
+module Ch24_DataIni where
 
 import Control.Applicative
 import Data.ByteString (ByteString)
@@ -120,6 +120,9 @@ parseIni = do
   let mapOfSections =
         foldr rollup M.empty sections
   return (Config mapOfSections)
+
+parseIniContents :: ByteString -> Maybe Config
+parseIniContents = maybeSuccess <$> parseByteString parseIni mempty
 
 maybeSuccess :: Result a -> Maybe a
 maybeSuccess (Success a) = Just a
